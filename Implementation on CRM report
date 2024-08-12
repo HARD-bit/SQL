@@ -1,0 +1,84 @@
+
+SELECT 
+    j.EmailName as EmailName,
+    sen.country,
+    sen.brand,
+    COALESCE(SUM(s.Sent), 0) AS Sent,
+    COALESCE(SUM(s.Sent) - SUM(b.Bounced), 0) AS Delivered,
+    COALESCE(SUM(o.Opened), 0) AS Opened,
+    COALESCE(SUM(c.Clicked), 0) AS Clicked,
+    COALESCE(SUM(b.Bounced), 0) AS Bounced,
+    COALESCE(SUM(u.Unsubscribed), 0) AS Unsubscribed
+FROM 
+    _Job j 
+LEFT JOIN 
+    (
+        SELECT 
+            JobID, SubscriberKey,
+            COUNT(*) AS Sent
+        FROM 
+            _Sent
+        GROUP BY 
+            JobID, SubscriberKey
+    ) s ON j.JobID = s.JobID
+LEFT JOIN 
+    (
+        SELECT 
+            JobID, SubscriberKey,
+            COUNT(DISTINCT SubscriberID) AS Opened
+        FROM 
+            _Open
+        WHERE 
+            IsUnique = 1
+        GROUP BY 
+            JobID, SubscriberKey
+    ) o ON j.JobID = o.JobID AND s.SubscriberKey = o.SubscriberKey
+LEFT JOIN 
+    (
+        SELECT 
+            JobID, SubscriberKey,
+            COUNT(DISTINCT SubscriberID) AS Clicked
+        FROM 
+            _Click
+        WHERE 
+            IsUnique = 1
+        GROUP BY 
+            JobID, SubscriberKey
+    ) c ON j.JobID = c.JobID AND s.SubscriberKey = c.SubscriberKey
+LEFT JOIN 
+    (
+        SELECT 
+            JobID, SubscriberKey,
+            COUNT(DISTINCT SubscriberID) AS Bounced
+        FROM 
+            _Bounce
+        WHERE 
+            IsUnique = 1
+        GROUP BY 
+            JobID, SubscriberKey
+    ) b ON j.JobID = b.JobID AND s.SubscriberKey = b.SubscriberKey
+LEFT JOIN 
+    (
+        SELECT 
+            JobID, SubscriberKey,
+            COUNT(DISTINCT SubscriberID) AS Unsubscribed
+        FROM 
+            _Unsubscribe
+        WHERE 
+            IsUnique = 1
+        GROUP BY 
+            JobID, SubscriberKey
+    ) u ON j.JobID = u.JobID AND s.SubscriberKey = u.SubscriberKey
+LEFT JOIN 
+    (
+        SELECT 
+            country, brand, JobID, SubscriberKey
+        FROM 
+            ent.emailsendlog_shared_prod
+        GROUP BY 
+            country, brand, JobID, SubscriberKey
+    ) sen ON s.JobID = sen.JobID AND s.SubscriberKey = sen.SubscriberKey
+WHERE 
+    j.category  not LIKE '%test%'
+GROUP BY 
+    j.EmailName, sen.country, sen.brand
