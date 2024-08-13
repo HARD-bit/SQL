@@ -1,0 +1,49 @@
+
+ SELECT 
+    CONTACTABILITYCOUNTRY, 
+    type, 
+    COUNT(*) as email_count
+FROM (
+    SELECT 
+        ROW_NUMBER() OVER (PARTITION BY EMAIL ORDER BY type DESC) AS rn,
+        CONTACTABILITYCOUNTRY, 
+        EMAIL, 
+        type
+    FROM (
+        SELECT 
+            c.CONTACTABILITYCOUNTRY, 
+            c.EMAIL,
+            'offer' AS type
+        FROM ENT.IN_Quote q
+        INNER JOIN ENT.IN_ACCOUNT a ON a.ID_PARTY = q.ID_PARTY
+        INNER JOIN FIALL_B2CB_CONTACT_BRANDOPTIN c ON a.Account_Salesforce_ID = c.ACCOUNTID 
+        WHERE c.EMAILOPTIN = '1' 
+          AND c.EMAIL IS NOT NULL 
+          AND c.SUBSCRIBERKEY IS NOT NULL
+          AND c.ONGOINGCLAIM = '0' 
+          AND q.RECORD_VALIDITY = 'Y'
+          AND q.QUOTE_BRAND = '070'
+          AND (q.QUOTE_MODEL = '428' OR q.QUOTE_MODEL = '429'OR q.QUOTE_MODEL = '821')
+        
+        UNION
+        
+        SELECT 
+            c.CONTACTABILITYCOUNTRY, 
+            c.EMAIL,
+            'ocf' AS type
+        FROM ENT.IN_ocf q
+        INNER JOIN ENT.IN_ACCOUNT a ON a.ID_PARTY = q.ID_PARTY
+        INNER JOIN FIALL_B2CB_CONTACT_BRANDOPTIN c ON a.Account_Salesforce_ID = c.ACCOUNTID 
+        LEFT JOIN ent.IN_LEAD l ON l.ID_PARTY = q.ID_PARTY
+        WHERE 
+         
+           c.SUBSCRIBERKEY IS NOT NULL
+          AND c.ONGOINGCLAIM = '0' 
+          AND q.BRAND = '070'
+          AND q.RECORD_VALIDITY = 'Y'
+          AND (q.MODEL = '428' OR q.MODEL = '429'OR q.MODEL = '821')
+		  AND l.LEAD_DATE >= q.OCF_DATE
+    ) AS CombinedResults
+) AS DeduplicatedResults
+WHERE rn = 1
+GROUP BY CONTACTABILITYCOUNTRY, type
